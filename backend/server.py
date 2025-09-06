@@ -302,23 +302,34 @@ async def get_classes(admin: dict = Depends(require_admin)):
 @api_router.post("/admin/classes", response_model=Class)
 async def create_class(class_data: ClassCreate, admin: dict = Depends(require_admin)):
     """Create new class"""
-    # Get teacher info if teacher_id provided
-    teacher_name = None
-    if class_data.teacher_id:
-        teacher = await db.users.find_one({"id": class_data.teacher_id})
-        if teacher:
-            teacher_name = teacher["name"]
-    
-    new_class = Class(
-        name=class_data.name,
-        grade=class_data.grade,
-        section=class_data.section,
-        teacher_id=class_data.teacher_id,
-        teacher_name=teacher_name
-    )
-    
-    await db.classes.insert_one(new_class.dict())
-    return new_class
+    try:
+        # Get teacher info if teacher_id provided
+        teacher_name = None
+        if class_data.teacher_id:
+            teacher = await db.users.find_one({"id": class_data.teacher_id})
+            if teacher:
+                teacher_name = teacher["name"]
+        
+        new_class = Class(
+            name=class_data.name,
+            grade=class_data.grade,
+            section=class_data.section,
+            teacher_id=class_data.teacher_id,
+            teacher_name=teacher_name
+        )
+        
+        class_dict = new_class.dict()
+        await db.classes.insert_one(class_dict)
+        
+        # Remove _id for response
+        if '_id' in class_dict:
+            del class_dict['_id']
+        
+        return Class(**class_dict)
+        
+    except Exception as e:
+        logger.error(f"Error creating class: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create class: {str(e)}")
 
 @api_router.get("/admin/teachers")
 async def get_teachers(admin: dict = Depends(require_admin)):
