@@ -286,6 +286,10 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
 async def get_classes(admin: dict = Depends(require_admin)):
     """Get all classes"""
     classes = await db.classes.find().to_list(1000)
+    # Remove MongoDB _id fields
+    for class_doc in classes:
+        if '_id' in class_doc:
+            del class_doc['_id']
     return [Class(**class_doc) for class_doc in classes]
 
 @api_router.post("/admin/classes", response_model=Class)
