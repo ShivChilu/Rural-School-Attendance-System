@@ -222,11 +222,15 @@ async def create_session(session_data: SessionData, response: Response):
                 picture=user_data.get("picture"),
                 role=role
             )
-            await db.users.insert_one(new_user.dict())
-            user = new_user.dict()
+            user_dict = new_user.dict()
+            await db.users.insert_one(user_dict)
+            user = user_dict
         else:
             logger.info(f"Found existing user: {existing_user['email']}")
-            user = existing_user
+            # Remove MongoDB _id field to avoid serialization issues
+            user = existing_user.copy()
+            if '_id' in user:
+                del user['_id']
         
         # Create session
         session_token = user_data["session_token"]
