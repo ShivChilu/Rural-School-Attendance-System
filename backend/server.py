@@ -317,6 +317,7 @@ async def create_class(class_data: ClassCreate, admin: dict = Depends(require_ad
 async def get_teachers(admin: dict = Depends(require_admin)):
     """Get all teachers"""
     teachers = await db.users.find({"role": "teacher"}).to_list(1000)
+    # Remove MongoDB _id fields and return only necessary fields
     return [{"id": t["id"], "name": t["name"], "email": t["email"]} for t in teachers]
 
 @api_router.put("/admin/classes/{class_id}")
@@ -343,6 +344,10 @@ async def assign_teacher(class_id: str, teacher_id: str, admin: dict = Depends(r
 async def get_teacher_classes(current_user: dict = Depends(get_current_user)):
     """Get classes assigned to current teacher"""
     classes = await db.classes.find({"teacher_id": current_user["id"]}).to_list(1000)
+    # Remove MongoDB _id fields
+    for class_doc in classes:
+        if '_id' in class_doc:
+            del class_doc['_id']
     return [Class(**class_doc) for class_doc in classes]
 
 @api_router.get("/teacher/classes/{class_id}/students")
@@ -355,6 +360,10 @@ async def get_class_students(class_id: str, current_user: dict = Depends(get_cur
             raise HTTPException(status_code=403, detail="Access denied to this class")
     
     students = await db.students.find({"class_id": class_id}).to_list(1000)
+    # Remove MongoDB _id fields
+    for student in students:
+        if '_id' in student:
+            del student['_id']
     return [Student(**student) for student in students]
 
 @api_router.post("/teacher/classes/{class_id}/students")
