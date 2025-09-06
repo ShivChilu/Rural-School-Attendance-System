@@ -186,17 +186,46 @@ const ProfilePage = () => {
       try {
         console.log('OAuth callback - Full URL:', window.location.href);
         console.log('OAuth callback - Hash:', location.hash);
+        console.log('OAuth callback - Search:', location.search);
         
-        // Extract session_id from URL fragment
-        const hash = location.hash;
-        const params = new URLSearchParams(hash.substring(1));
-        const sessionId = params.get('session_id');
+        let sessionId = null;
         
-        console.log('Extracted session_id:', sessionId);
+        // Try to extract session_id from URL fragment first
+        if (location.hash) {
+          const hash = location.hash;
+          const params = new URLSearchParams(hash.substring(1));
+          sessionId = params.get('session_id');
+          console.log('Session ID from hash:', sessionId);
+        }
+        
+        // If not found in hash, try search params
+        if (!sessionId && location.search) {
+          const searchParams = new URLSearchParams(location.search);
+          sessionId = searchParams.get('session_id');
+          console.log('Session ID from search:', sessionId);
+        }
+        
+        // Also check for common OAuth callback parameters
+        if (!sessionId) {
+          const searchParams = new URLSearchParams(location.search);
+          const hashParams = new URLSearchParams(location.hash.substring(1));
+          
+          // Check various possible parameter names
+          sessionId = sessionId || 
+                     searchParams.get('code') || 
+                     hashParams.get('code') ||
+                     searchParams.get('session') ||
+                     hashParams.get('session') ||
+                     searchParams.get('token') ||
+                     hashParams.get('token');
+          
+          console.log('Session ID from alternative params:', sessionId);
+        }
 
         if (!sessionId) {
-          console.error('No session ID found in URL hash:', hash);
-          throw new Error('No session ID found in callback URL. Please try logging in again.');
+          console.error('No session ID found in URL');
+          console.log('Full location object:', location);
+          throw new Error('No session ID found in callback URL. The authentication process may have failed. Please try logging in again.');
         }
 
         console.log('Attempting to login with session_id:', sessionId);
@@ -214,15 +243,29 @@ const ProfilePage = () => {
         }
       } catch (error) {
         console.error('Authentication error details:', error);
-        const errorMessage = error.response?.data?.detail || error.message || 'Authentication failed. Please try again.';
+        let errorMessage = 'Authentication failed. Please try again.';
+        
+        if (error.response?.data?.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
         setError(errorMessage);
-        setTimeout(() => navigate('/'), 5000); // Increased timeout
+        
+        // Longer timeout and redirect to home
+        setTimeout(() => {
+          navigate('/');
+        }, 8000);
       } finally {
         setLoading(false);
       }
     };
 
-    handleCallback();
+    // Add a small delay to ensure the URL is fully loaded
+    const timer = setTimeout(handleCallback, 100);
+    
+    return () => clearTimeout(timer);
   }, [location, login, navigate]);
 
   if (loading) {
