@@ -184,17 +184,27 @@ const ProfilePage = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        console.log('OAuth callback - Full URL:', window.location.href);
+        console.log('OAuth callback - Hash:', location.hash);
+        
         // Extract session_id from URL fragment
         const hash = location.hash;
         const params = new URLSearchParams(hash.substring(1));
         const sessionId = params.get('session_id');
+        
+        console.log('Extracted session_id:', sessionId);
 
         if (!sessionId) {
-          throw new Error('No session ID found in callback');
+          console.error('No session ID found in URL hash:', hash);
+          throw new Error('No session ID found in callback URL. Please try logging in again.');
         }
 
+        console.log('Attempting to login with session_id:', sessionId);
+        
         // Login with session ID
         const user = await login(sessionId);
+        
+        console.log('Login successful, user:', user);
         
         // Redirect based on role
         if (user.role === 'admin') {
@@ -203,9 +213,10 @@ const ProfilePage = () => {
           navigate('/teacher');
         }
       } catch (error) {
-        console.error('Authentication error:', error);
-        setError('Authentication failed. Please try again.');
-        setTimeout(() => navigate('/'), 3000);
+        console.error('Authentication error details:', error);
+        const errorMessage = error.response?.data?.detail || error.message || 'Authentication failed. Please try again.';
+        setError(errorMessage);
+        setTimeout(() => navigate('/'), 5000); // Increased timeout
       } finally {
         setLoading(false);
       }
