@@ -86,11 +86,15 @@ async def get_current_user(authorization: HTTPAuthorizationCredentials = Depends
         raise HTTPException(status_code=401, detail="Session expired")
     
     # Get user data
-    user = await db.users.find_one({"id": session['user_id']})
-    if not user:
+    user_doc = await db.users.find_one({"id": session['user_id']})
+    if not user_doc:
         raise HTTPException(status_code=401, detail="User not found")
     
-    return user
+    # Remove MongoDB _id field to avoid serialization issues
+    if '_id' in user_doc:
+        del user_doc['_id']
+    
+    return user_doc
 
 async def require_admin(current_user: dict = Depends(get_current_user)):
     """Require admin role"""
