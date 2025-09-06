@@ -181,17 +181,25 @@ async def login():
 async def create_session(session_data: SessionData, response: Response):
     """Create session from OAuth callback"""
     try:
+        logger.info(f"Creating session for session_id: {session_data.session_id}")
+        
         # Call Emergent auth API to get user data
         headers = {"X-Session-ID": session_data.session_id}
+        logger.info(f"Calling Emergent auth API with headers: {headers}")
+        
         auth_response = requests.get(
             "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
             headers=headers
         )
         
+        logger.info(f"Emergent auth API response status: {auth_response.status_code}")
+        logger.info(f"Emergent auth API response: {auth_response.text}")
+        
         if auth_response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Invalid session ID")
+            raise HTTPException(status_code=400, detail=f"Invalid session ID. Auth API returned: {auth_response.status_code} - {auth_response.text}")
         
         user_data = auth_response.json()
+        logger.info(f"User data from auth API: {user_data}")
         
         # Check if user exists, if not create new user
         existing_user = await db.users.find_one({"email": user_data["email"]})
@@ -200,6 +208,8 @@ async def create_session(session_data: SessionData, response: Response):
             # Create new user (first user is admin)
             user_count = await db.users.count_documents({})
             role = "admin" if user_count == 0 else "teacher"
+            
+            logger.info(f"Creating new user with role: {role} (total users: {user_count})")
             
             new_user = User(
                 id=str(uuid.uuid4()),
@@ -211,6 +221,7 @@ async def create_session(session_data: SessionData, response: Response):
             await db.users.insert_one(new_user.dict())
             user = new_user.dict()
         else:
+            logger.info(f"Found existing user: {existing_user['email']}")
             user = existing_user
         
         # Create session
@@ -227,6 +238,8 @@ async def create_session(session_data: SessionData, response: Response):
         await db.sessions.delete_many({"user_id": user["id"]})
         await db.sessions.insert_one(session)
         
+        logger.info(f"Created session for user: {user['email']}")
+        
         # Set secure cookie
         response.set_cookie(
             key="session_token",
@@ -241,6 +254,7 @@ async def create_session(session_data: SessionData, response: Response):
         return {"user": user, "session_token": session_token}
         
     except Exception as e:
+        logger.error(f"Authentication failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
 
 @api_router.post("/auth/logout")
