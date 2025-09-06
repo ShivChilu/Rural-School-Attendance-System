@@ -81,7 +81,14 @@ async def get_current_user(authorization: HTTPAuthorizationCredentials = Depends
         raise HTTPException(status_code=401, detail="Invalid session token")
     
     # Check if session is expired
-    if session['expires_at'] < datetime.now(timezone.utc):
+    expires_at = session['expires_at']
+    current_time = datetime.now(timezone.utc)
+    
+    # Ensure both datetimes are timezone-aware for comparison
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    if expires_at < current_time:
         await db.sessions.delete_one({"session_token": token})
         raise HTTPException(status_code=401, detail="Session expired")
     
