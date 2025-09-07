@@ -566,7 +566,7 @@ async def mark_attendance(attendance_data: dict, current_user: dict = Depends(ge
         if face_crop is None:
             raise HTTPException(status_code=400, detail="No face detected in image. Please ensure the face is clearly visible and try again.")
         
-        # Step 2: Generate embedding for the input image using ArcFace
+        # Step 2: Generate embedding for the input image (currently disabled)
         input_embedding = generate_face_embedding_arcface(face_crop)
         if input_embedding is None:
             raise HTTPException(status_code=400, detail="Failed to process face. Please try with a clearer image.")
