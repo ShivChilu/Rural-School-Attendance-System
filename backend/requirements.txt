@@ -29,3 +29,5 @@ Pillow>=10.0.0
 aiofiles>=24.1.0
 mediapipe>=0.10.9
 tf-keras>=2.20.1
+insightface>=0.7.3
+onnxruntime>=1.16.0
