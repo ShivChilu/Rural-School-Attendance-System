@@ -17,16 +17,24 @@ import { Camera, Users, BookOpen, CheckCircle, XCircle, UserPlus, Settings, LogO
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Global flag to prevent multiple redirects
+let redirecting = false;
+
 // Axios interceptor for handling authentication
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Only redirect on 401 if we're not already on the login page
-    if (error.response?.status === 401 && window.location.pathname !== '/') {
+    // Only redirect on 401 if we're not already on the login page and not already redirecting
+    if (error.response?.status === 401 && 
+        window.location.pathname !== '/' && 
+        !redirecting) {
+      redirecting = true;
       localStorage.removeItem('user');
+      
       // Use a more gentle redirect approach
       setTimeout(() => {
         window.location.href = '/';
+        redirecting = false;
       }, 100);
     }
     return Promise.reject(error);
