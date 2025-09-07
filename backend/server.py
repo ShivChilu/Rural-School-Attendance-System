@@ -22,13 +22,9 @@ import asyncio
 import traceback
 import mediapipe as mp
 
-# Try to import DeepFace with error handling
-try:
-    from deepface import DeepFace
-    DEEPFACE_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: DeepFace import failed: {e}")
-    DEEPFACE_AVAILABLE = False
+# For now, let's use a simple OpenCV-based approach without DeepFace
+# We'll use MediaPipe for face detection and basic face comparison
+DEEPFACE_AVAILABLE = False
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
