@@ -1036,6 +1036,69 @@ const TeacherDashboard = () => {
     }
   };
 
+  const [enrollmentSession, setEnrollmentSession] = useState(null);
+  const [enrollmentProgress, setEnrollmentProgress] = useState(null);
+
+  const startEnrollmentSession = async (student) => {
+    try {
+      const response = await axios.post(
+        `${API}/students/${student.id}/enroll-session`,
+        {},
+        { withCredentials: true }
+      );
+      
+      setEnrollmentSession({
+        ...response.data,
+        student: student
+      });
+      setEnrollingStudent(student);
+      setShowEnrollStudent(true);
+      
+    } catch (error) {
+      console.error('Error starting enrollment session:', error);
+    }
+  };
+
+  const enrollStudentImage = async (imageData) => {
+    if (!enrollmentSession) return;
+    
+    try {
+      const response = await axios.post(
+        `${API}/students/${enrollmentSession.student.id}/enroll-image`,
+        { 
+          image: imageData,
+          angle: getCurrentCaptureAngle()
+        },
+        { withCredentials: true }
+      );
+      
+      setEnrollmentProgress(response.data);
+      
+      if (response.data.enrollment_complete) {
+        setShowEnrollStudent(false);
+        setEnrollmentSession(null);
+        setEnrollingStudent(null);
+        setEnrollmentProgress(null);
+        fetchStudents(selectedClass.id);
+      }
+      
+    } catch (error) {
+      console.error('Error enrolling student image:', error);
+      setEnrollmentProgress({
+        success: false,
+        message: error.response?.data?.detail || 'Enrollment failed',
+        retry: true
+      });
+    }
+  };
+
+  const getCurrentCaptureAngle = () => {
+    if (!enrollmentProgress) return "front";
+    const angles = ["front", "left", "right", "front_smile", "front_neutral"];
+    const currentImage = enrollmentProgress.images_captured || 0;
+    return angles[currentImage] || "front";
+  };
+
   const enrollStudentFace = async (imageData) => {
     try {
       await axios.post(
