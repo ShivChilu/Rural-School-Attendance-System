@@ -46,6 +46,66 @@ mp_drawing = mp.solutions.drawing_utils
 face_detection = mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
 
 # Helper Functions
+def detect_and_crop_face_mediapipe(image_array: np.ndarray):
+    """Use Mediapipe to detect and crop faces from image"""
+    try:
+        # Convert RGB to BGR for mediapipe
+        image_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+        
+        # Detect faces using Mediapipe
+        results = face_detection.process(image_bgr)
+        
+        if not results.detections:
+            return None
+        
+        # Get the first (most confident) face detection
+        detection = results.detections[0]
+        
+        # Get bounding box
+        bbox = detection.location_data.relative_bounding_box
+        h, w, _ = image_array.shape
+        
+        # Convert relative coordinates to absolute
+        x = int(bbox.xmin * w)
+        y = int(bbox.ymin * h)
+        width = int(bbox.width * w)
+        height = int(bbox.height * h)
+        
+        # Add some padding around the face
+        padding = 20
+        x = max(0, x - padding)
+        y = max(0, y - padding)
+        width = min(w - x, width + 2 * padding)
+        height = min(h - y, height + 2 * padding)
+        
+        # Crop the face
+        face_crop = image_array[y:y+height, x:x+width]
+        
+        return face_crop
+        
+    except Exception as e:
+        print(f"Mediapipe face detection error: {str(e)}")
+        return None
+
+def generate_face_embedding_arcface(face_image: np.ndarray):
+    """Generate face embedding using DeepFace with ArcFace model"""
+    try:
+        # Use DeepFace with ArcFace model for better accuracy
+        embedding_result = DeepFace.represent(
+            img_path=face_image,
+            model_name="ArcFace",  # Changed from Facenet to ArcFace
+            enforce_detection=False  # We already detected face with Mediapipe
+        )
+        
+        if not embedding_result or len(embedding_result) == 0:
+            return None
+            
+        return embedding_result[0]["embedding"]
+        
+    except Exception as e:
+        print(f"ArcFace embedding generation error: {str(e)}")
+        return None
+
 def decode_base64_image(base64_string: str) -> np.ndarray:
     """Decode base64 image to numpy array for DeepFace processing"""
     try:
