@@ -494,28 +494,21 @@ async def enroll_student_face(student_id: str, image_data: dict, current_user: d
         # Decode image
         image_array = decode_base64_image(image_data["image"])
         
-        # Generate face embedding using DeepFace
-        try:
-            embedding_result = DeepFace.represent(
-                img_path=image_array,
-                model_name="Facenet",
-                enforce_detection=True
-            )
-            
-            if not embedding_result or len(embedding_result) == 0:
-                raise HTTPException(status_code=400, detail="No face detected in image")
-            
-            # Use the first face if multiple faces detected
-            embedding = embedding_result[0]["embedding"]
-            
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Face processing failed: {str(e)}")
+        # Step 1: Detect and crop face using Mediapipe
+        face_crop = detect_and_crop_face_mediapipe(image_array)
+        if face_crop is None:
+            raise HTTPException(status_code=400, detail="No face detected in image. Please ensure the face is clearly visible and try again.")
+        
+        # Step 2: Generate face embedding using DeepFace with ArcFace
+        embedding = generate_face_embedding_arcface(face_crop)
+        if embedding is None:
+            raise HTTPException(status_code=400, detail="Failed to generate face embedding. Please try with a clearer image.")
         
         # Store embedding
         face_embedding = FaceEmbedding(
             student_id=student_id,
             embedding=embedding,
-            model_name="Facenet"
+            model_name="ArcFace"
         )
         
         # Remove old embeddings and add new one
