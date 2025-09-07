@@ -97,6 +97,9 @@ def detect_and_crop_face_mediapipe(image_array: np.ndarray):
 def generate_face_embedding_arcface(face_image: np.ndarray):
     """Generate face embedding using DeepFace with ArcFace model"""
     try:
+        if not DEEPFACE_AVAILABLE:
+            raise HTTPException(status_code=500, detail="DeepFace library not available")
+            
         # Use DeepFace with ArcFace model for better accuracy
         embedding_result = DeepFace.represent(
             img_path=face_image,
