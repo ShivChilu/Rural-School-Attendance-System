@@ -1232,14 +1232,11 @@ const TeacherDashboard = () => {
                                     </Badge>
                                     <Button
                                       size="sm"
-                                      onClick={() => {
-                                        setEnrollingStudent(student);
-                                        setShowEnrollStudent(true);
-                                      }}
+                                      onClick={() => startEnrollmentSession(student)}
                                       className="bg-blue-600 hover:bg-blue-700"
                                     >
                                       <Camera className="h-3 w-3 mr-1" />
-                                      Enroll Face
+                                      Enhanced Enrollment (5 Photos)
                                     </Button>
                                   </>
                                 )}
