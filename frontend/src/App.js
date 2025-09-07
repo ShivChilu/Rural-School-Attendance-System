@@ -39,19 +39,24 @@ const AuthContext = React.createContext();
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    if (!authChecked) {
+      checkAuth();
+    }
+  }, [authChecked]);
 
   const checkAuth = async () => {
     try {
       const response = await axios.get(`${API}/auth/me`, { withCredentials: true });
       setUser(response.data.user);
     } catch (error) {
+      // Don't redirect on initial auth check failure - user might just not be logged in
       setUser(null);
     } finally {
       setLoading(false);
+      setAuthChecked(true);
     }
   };
 
