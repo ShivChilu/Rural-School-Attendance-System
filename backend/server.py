@@ -546,21 +546,17 @@ async def mark_attendance(attendance_data: dict, current_user: dict = Depends(ge
         # Decode image
         image_array = decode_base64_image(image_data)
         
-        # Generate embedding for the input image
-        try:
-            input_embedding = DeepFace.represent(
-                img_path=image_array,
-                model_name="Facenet",
-                enforce_detection=True
-            )
-            
-            if not input_embedding or len(input_embedding) == 0:
-                raise HTTPException(status_code=400, detail="No face detected in image")
-            
-            input_vector = np.array(input_embedding[0]["embedding"])
-            
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Face processing failed: {str(e)}")
+        # Step 1: Detect and crop face using Mediapipe
+        face_crop = detect_and_crop_face_mediapipe(image_array)
+        if face_crop is None:
+            raise HTTPException(status_code=400, detail="No face detected in image. Please ensure the face is clearly visible and try again.")
+        
+        # Step 2: Generate embedding for the input image using ArcFace
+        input_embedding = generate_face_embedding_arcface(face_crop)
+        if input_embedding is None:
+            raise HTTPException(status_code=400, detail="Failed to process face. Please try with a clearer image.")
+        
+        input_vector = np.array(input_embedding)
         
         # Get all enrolled students in this class
         students = await db.students.find({"class_id": class_id, "is_enrolled": True}).to_list(1000)
