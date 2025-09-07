@@ -103,6 +103,30 @@ def generate_face_embedding_arcface(face_image: np.ndarray):
         print(f"Face embedding generation error: {str(e)}")
         return None
 
+def generate_face_embedding_simple(face_image: np.ndarray):
+    """Generate a simple face representation using basic image features"""
+    try:
+        # Convert to grayscale
+        if len(face_image.shape) == 3:
+            gray = cv2.cvtColor(face_image, cv2.COLOR_RGB2GRAY)
+        else:
+            gray = face_image
+            
+        # Resize to standard size
+        resized = cv2.resize(gray, (100, 100))
+        
+        # Normalize pixel values
+        normalized = resized.astype(np.float32) / 255.0
+        
+        # Flatten to create a simple "embedding"
+        embedding = normalized.flatten().tolist()
+        
+        return embedding
+        
+    except Exception as e:
+        print(f"Simple face embedding generation error: {str(e)}")
+        return None
+
 def decode_base64_image(base64_string: str) -> np.ndarray:
     """Decode base64 image to numpy array for image processing"""
     try:
