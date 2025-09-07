@@ -314,6 +314,340 @@ const ProfilePage = () => {
   return null;
 };
 
+// Enhanced Camera Component for multi-image capture
+const EnhancedCameraCapture = ({ onCapture, onClose, targetImages = 5, currentCount = 0 }) => {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [stream, setStream] = useState(null);
+  const [capturing, setCapturing] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    startCamera();
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: 640, 
+          height: 480,
+          facingMode: 'user'
+        } 
+      });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (error) {
+      console.error('Camera access error:', error);
+    }
+  };
+
+  const startCountdown = () => {
+    setCountdown(3);
+    const countdownInterval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          capturePhoto();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      setCapturing(true);
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      
+      context.drawImage(videoRef.current, 0, 0);
+      
+      const imageData = canvas.toDataURL('image/jpeg', 0.8);
+      onCapture(imageData);
+      
+      setTimeout(() => {
+        setCapturing(false);
+      }, 500);
+    }
+  };
+
+  const getInstructionForImage = (count) => {
+    const instructions = [
+      "Look straight at the camera",
+      "Turn your head slightly to the left",
+      "Turn your head slightly to the right", 
+      "Smile naturally",
+      "Look straight again with a neutral expression"
+    ];
+    return instructions[count] || "Look at the camera";
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center mb-4">
+        <h3 className="text-lg font-semibold mb-2">
+          Capturing Image {currentCount + 1} of {targetImages}
+        </h3>
+        <p className="text-sm text-gray-600">
+          {getInstructionForImage(currentCount)}
+        </p>
+        <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+          <div 
+            className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${(currentCount / targetImages) * 100}%` }}
+          ></div>
+        </div>
+      </div>
+
+      <div className="relative">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="w-full rounded-lg"
+        />
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
+        
+        {countdown > 0 && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
+            <div className="text-6xl font-bold text-white">{countdown}</div>
+          </div>
+        )}
+        
+        {capturing && (
+          <div className="absolute inset-0 bg-white opacity-70 rounded-lg flex items-center justify-center">
+            <div className="text-2xl font-bold text-gray-800">📸</div>
+          </div>
+        )}
+      </div>
+      
+      <div className="flex gap-2 justify-center">
+        <Button 
+          onClick={startCountdown} 
+          className="bg-emerald-600 hover:bg-emerald-700"
+          disabled={capturing || countdown > 0}
+        >
+          <Camera className="h-4 w-4 mr-2" />
+          {countdown > 0 ? `${countdown}...` : 'Capture Photo'}
+        </Button>
+        <Button onClick={onClose} variant="outline">
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+// Enhanced Attendance Marking Component
+const EnhancedAttendanceMarking = ({ classId }) => {
+  const [showCamera, setShowCamera] = useState(false);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [date] = useState(new Date().toISOString().split('T')[0]);
+
+  const markAttendance = async (imageData) => {
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${API}/attendance/mark-enhanced`,
+        {
+          class_id: classId,
+          image: imageData,
+          date: date,
+          retry_count: retryCount
+        },
+        { withCredentials: true }
+      );
+      
+      const data = response.data;
+      setResult(data);
+      
+      if (data.confirmation_required || data.manual_confirm_needed) {
+        setShowConfirmation(true);
+      }
+      
+      if (!data.recognized && data.retry_recommended) {
+        setRetryCount(prev => prev + 1);
+      } else {
+        setShowCamera(false);
+        setRetryCount(0);
+      }
+      
+    } catch (error) {
+      console.error('Error marking attendance:', error);
+      setResult({
+        recognized: false,
+        message: error.response?.data?.detail || 'Failed to mark attendance',
+        retry_recommended: retryCount < 3
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmManualAttendance = async (confirmed) => {
+    if (!result.suggested_student) return;
+    
+    try {
+      const response = await axios.post(
+        `${API}/attendance/confirm-manual`,
+        {
+          student_id: result.suggested_student.id,
+          class_id: classId,
+          date: date,
+          confirmed: confirmed
+        },
+        { withCredentials: true }
+      );
+      
+      setResult({
+        ...response.data,
+        recognized: confirmed,
+        student: result.suggested_student
+      });
+      setShowConfirmation(false);
+      setShowCamera(false);
+      
+    } catch (error) {
+      console.error('Error confirming attendance:', error);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Enhanced Attendance Marking - {date}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {!showCamera && !showConfirmation && (
+            <div classe="text-center">
+              <Button
+                onClick={() => {
+                  setShowCamera(true);
+                  setResult(null);
+                  setRetryCount(0);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-3"
+                disabled={loading}
+              >
+                <Camera className="h-5 w-5 mr-2" />
+                Start Face Recognition
+              </Button>
+              <p className="text-sm text-gray-600 mt-2">
+                Advanced face recognition with quality validation
+              </p>
+            </div>
+          )}
+
+          {showCamera && (
+            <CameraCapture
+              onCapture={markAttendance}
+              onClose={() => {
+                setShowCamera(false);
+                setRetryCount(0);
+              }}
+            />
+          )}
+
+          {loading && (
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-emerald-600 border-t-transparent mx-auto mb-2"></div>
+              <p>Processing with advanced face recognition...</p>
+            </div>
+          )}
+
+          {showConfirmation && result && (
+            <Card className="border-yellow-200 bg-yellow-50">
+              <CardContent className="p-6">
+                <h3 className="font-semibold text-yellow-800 mb-4">
+                  Manual Confirmation Required
+                </h3>
+                <p className="mb-4">
+                  Student possibly identified as <strong>{result.suggested_student?.name}</strong>
+                </p>
+                <p className="text-sm text-gray-600 mb-4">
+                  Confidence: {Math.round(result.confidence * 100)}%
+                </p>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => confirmManualAttendance(true)}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirm & Mark Present
+                  </Button>
+                  <Button 
+                    onClick={() => confirmManualAttendance(false)}
+                    variant="outline"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {result && !showConfirmation && (
+            <Alert className={result.recognized ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+              <div className="flex items-center gap-2">
+                {result.recognized ? (
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-600" />
+                )}
+                <AlertDescription>
+                  <div>
+                    <p className="font-medium">{result.message}</p>
+                    {result.student && (
+                      <div className="mt-2">
+                        <p>Student: {result.student.name} (Roll: {result.student.roll_number})</p>
+                        {result.confidence > 0 && (
+                          <p>Confidence: {Math.round(result.confidence * 100)}%</p>
+                        )}
+                        {result.already_marked && (
+                          <p className="text-amber-600 font-medium">Already marked present today</p>
+                        )}
+                      </div>
+                    )}
+                    {result.retry_recommended && (
+                      <div className="mt-2">
+                        <Button 
+                          onClick={() => setShowCamera(true)}
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          Try Again ({3 - retryCount} attempts left)
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </AlertDescription>
+              </div>
+            </Alert>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 // Camera Component for capturing photos
 const CameraCapture = ({ onCapture, onClose }) => {
   const videoRef = useRef(null);
