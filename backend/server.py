@@ -587,10 +587,170 @@ async def add_student(class_id: str, student_data: StudentCreate, current_user: 
     await db.students.insert_one(new_student.dict())
     return new_student
 
-# Student Enrollment Routes
+# Enhanced Student Enrollment Routes
+@api_router.post("/students/{student_id}/enroll-session")
+async def start_enrollment_session(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Start a new enrollment session for multiple image capture"""
+    try:
+        # Get student
+        student = await db.students.find_one({"id": student_id})
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        # Check teacher access to this class
+        if current_user["role"] != "admin":
+            class_doc = await db.classes.find_one({"id": student["class_id"], "teacher_id": current_user["id"]})
+            if not class_doc:
+                raise HTTPException(status_code=403, detail="Access denied to this class")
+        
+        # Clear any existing enrollment session
+        await db.enrollment_sessions.delete_many({"student_id": student_id})
+        
+        # Create new enrollment session
+        session = EnrollmentSession(
+            student_id=student_id,
+            target_images=5  # Capture 5 images for robust recognition
+        )
+        
+        await db.enrollment_sessions.insert_one(session.dict())
+        
+        return {
+            "message": "Enrollment session started",
+            "session_id": session.id,
+            "target_images": session.target_images
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start enrollment session: {str(e)}")
+
+@api_router.post("/students/{student_id}/enroll-image")
+async def enroll_student_image(student_id: str, image_data: dict, current_user: dict = Depends(get_current_user)):
+    """Enroll a single image during enrollment session"""
+    try:
+        # Get student
+        student = await db.students.find_one({"id": student_id})
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        # Check teacher access to this class
+        if current_user["role"] != "admin":
+            class_doc = await db.classes.find_one({"id": student["class_id"], "teacher_id": current_user["id"]})
+            if not class_doc:
+                raise HTTPException(status_code=403, detail="Access denied to this class")
+        
+        # Get active enrollment session
+        session = await db.enrollment_sessions.find_one({
+            "student_id": student_id, 
+            "session_status": "active"
+        })
+        if not session:
+            raise HTTPException(status_code=400, detail="No active enrollment session. Please start enrollment first.")
+        
+        # Decode image
+        image_array = decode_base64_image(image_data["image"])
+        
+        # Step 1: Validate face quality using Face Mesh
+        quality_valid, quality_message = validate_face_quality(image_array)
+        if not quality_valid:
+            return {
+                "success": False,
+                "message": f"Image quality check failed: {quality_message}",
+                "retry": True
+            }
+        
+        # Step 2: Detect and crop face using Mediapipe
+        face_crop = detect_and_crop_face_mediapipe(image_array)
+        if face_crop is None:
+            return {
+                "success": False,
+                "message": "No face detected in image. Please ensure the face is clearly visible and try again.",
+                "retry": True
+            }
+        
+        # Step 3: Generate face embedding
+        embedding = generate_face_embedding_simple(face_crop)
+        if embedding is None:
+            return {
+                "success": False,
+                "message": "Failed to generate face embedding. Please try with a clearer image.",
+                "retry": True
+            }
+        
+        # Step 4: Calculate quality score (simple approach)
+        quality_score = calculate_image_quality_score(face_crop)
+        
+        # Step 5: Store embedding with metadata
+        face_embedding = FaceEmbedding(
+            student_id=student_id,
+            embedding=embedding,
+            image_index=session["images_captured"],
+            capture_angle=image_data.get("angle", "front"),
+            quality_score=quality_score,
+            model_name="Simple_CV"
+        )
+        
+        await db.face_embeddings.insert_one(face_embedding.dict())
+        
+        # Update session
+        new_count = session["images_captured"] + 1
+        session_complete = new_count >= session["target_images"]
+        
+        await db.enrollment_sessions.update_one(
+            {"id": session["id"]},
+            {
+                "$set": {
+                    "images_captured": new_count,
+                    "session_status": "completed" if session_complete else "active"
+                }
+            }
+        )
+        
+        # Update student enrollment status if session is complete
+        if session_complete:
+            await db.students.update_one(
+                {"id": student_id},
+                {"$set": {"is_enrolled": True}}
+            )
+        
+        return {
+            "success": True,
+            "message": f"Image {new_count} of {session['target_images']} captured successfully",
+            "images_captured": new_count,
+            "target_images": session["target_images"],
+            "enrollment_complete": session_complete,
+            "quality_score": quality_score
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image enrollment failed: {str(e)}")
+
+def calculate_image_quality_score(face_image: np.ndarray):
+    """Calculate a simple quality score for the face image"""
+    try:
+        # Convert to grayscale for analysis
+        if len(face_image.shape) == 3:
+            gray = cv2.cvtColor(face_image, cv2.COLOR_RGB2GRAY)
+        else:
+            gray = face_image
+        
+        # Calculate sharpness using Laplacian variance
+        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+        
+        # Normalize to 0-1 range (higher is better)
+        quality_score = min(laplacian_var / 1000.0, 1.0)
+        
+        return quality_score
+        
+    except Exception:
+        return 0.5  # Default quality score
+
 @api_router.post("/students/{student_id}/enroll")
 async def enroll_student_face(student_id: str, image_data: dict, current_user: dict = Depends(get_current_user)):
-    """Enroll student with face data"""
+    """Legacy single-image enrollment (kept for backward compatibility)"""
     try:
         # Get student
         student = await db.students.find_one({"id": student_id})
