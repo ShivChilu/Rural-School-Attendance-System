@@ -104,7 +104,7 @@ def generate_face_embedding_arcface(face_image: np.ndarray):
         return None
 
 def decode_base64_image(base64_string: str) -> np.ndarray:
-    """Decode base64 image to numpy array for DeepFace processing"""
+    """Decode base64 image to numpy array for image processing"""
     try:
         # Remove data URL prefix if present
         if ',' in base64_string:
