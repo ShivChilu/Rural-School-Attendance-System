@@ -1254,9 +1254,9 @@ const TeacherDashboard = () => {
                   </Card>
                 </TabsContent>
 
-                {/* Attendance Tab */}
+                {/* Enhanced Attendance Tab */}
                 <TabsContent value="attendance">
-                  <AttendanceMarking classId={selectedClass.id} />
+                  <EnhancedAttendanceMarking classId={selectedClass.id} />
                 </TabsContent>
 
                 {/* Reports Tab */}
