@@ -534,7 +534,7 @@ async def enroll_student_face(student_id: str, image_data: dict, current_user: d
         face_embedding = FaceEmbedding(
             student_id=student_id,
             embedding=embedding,
-            model_name="ArcFace"
+            model_name="Simple_CV"
         )
         
         # Remove old embeddings and add new one
