@@ -90,19 +90,6 @@ def detect_and_crop_face_mediapipe(image_array: np.ndarray):
         print(f"Mediapipe face detection error: {str(e)}")
         return None
 
-def generate_face_embedding_arcface(face_image: np.ndarray):
-    """Generate face embedding - currently disabled without DeepFace"""
-    try:
-        if not DEEPFACE_AVAILABLE:
-            raise HTTPException(status_code=500, detail="Face recognition library not available. Please contact administrator.")
-            
-        # DeepFace functionality disabled for now
-        return None
-        
-    except Exception as e:
-        print(f"Face embedding generation error: {str(e)}")
-        return None
-
 def generate_face_embedding_simple(face_image: np.ndarray):
     """Generate a simple face representation using basic image features"""
     try:
