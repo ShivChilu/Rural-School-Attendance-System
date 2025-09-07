@@ -282,11 +282,13 @@ async def create_session(session_data: SessionData, response: Response):
         existing_user = await db.users.find_one({"email": user_data["email"]})
         
         if not existing_user:
-            # Create new user (first user is admin)
-            user_count = await db.users.count_documents({})
-            role = "admin" if user_count == 0 else "teacher"
+            # Determine role: chiluverushivaprasad02@gmail.com is admin, others are teachers
+            if user_data["email"] == "chiluverushivaprasad02@gmail.com":
+                role = "admin"
+            else:
+                role = "teacher"
             
-            logger.info(f"Creating new user with role: {role} (total users: {user_count})")
+            logger.info(f"Creating new user with role: {role}")
             
             new_user = User(
                 id=str(uuid.uuid4()),
