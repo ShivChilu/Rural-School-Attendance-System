@@ -1362,15 +1362,82 @@ const TeacherDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Enroll Student Dialog */}
+      {/* Enhanced Enroll Student Dialog */}
       <Dialog open={showEnrollStudent} onOpenChange={setShowEnrollStudent}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Enroll {enrollingStudent?.name} - Face Recognition</DialogTitle>
+            <DialogTitle>
+              Enhanced Face Enrollment - {enrollingStudent?.name}
+            </DialogTitle>
           </DialogHeader>
-          <CameraCapture
-            onCapture={enrollStudentFace}
-            onClose={() => setShowEnrollStudent(false)}
+          
+          {enrollmentSession && (
+            <div className="mb-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-medium text-blue-800 mb-2">
+                  Multi-Image Enrollment for Better Recognition
+                </h4>
+                <p className="text-sm text-blue-600 mb-2">
+                  We'll capture {enrollmentSession.target_images} photos from different angles 
+                  to ensure accurate face recognition.
+                </p>
+                {enrollmentProgress && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress:</span>
+                      <span>{enrollmentProgress.images_captured || 0} / {enrollmentSession.target_images}</span>
+                    </div>
+                    <div className="w-full bg-blue-200 rounded-full h-2 mt-1">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${((enrollmentProgress.images_captured || 0) / enrollmentSession.target_images) * 100}%` 
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {enrollmentProgress && !enrollmentProgress.success && (
+            <Alert className="border-red-200 bg-red-50 mb-4">
+              <AlertDescription>
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <span>{enrollmentProgress.message}</span>
+                </div>
+                {enrollmentProgress.retry && (
+                  <p className="text-sm mt-2">Please try again with better lighting and face positioning.</p>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {enrollmentProgress && enrollmentProgress.success && (
+            <Alert className="border-green-200 bg-green-50 mb-4">
+              <AlertDescription>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>{enrollmentProgress.message}</span>
+                </div>
+                <div className="text-sm mt-1">
+                  Quality Score: {Math.round((enrollmentProgress.quality_score || 0) * 100)}%
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          <EnhancedCameraCapture
+            onCapture={enrollStudentImage}
+            onClose={() => {
+              setShowEnrollStudent(false);
+              setEnrollmentSession(null);
+              setEnrollmentProgress(null);
+            }}
+            targetImages={enrollmentSession?.target_images || 5}
+            currentCount={enrollmentProgress?.images_captured || 0}
           />
         </DialogContent>
       </Dialog>
