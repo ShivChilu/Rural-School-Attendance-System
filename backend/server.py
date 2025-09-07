@@ -567,7 +567,7 @@ async def mark_attendance(attendance_data: dict, current_user: dict = Depends(ge
         # Find matching student
         best_match = None
         best_distance = float('inf')
-        recognition_threshold = 0.6  # Adjust based on testing
+        recognition_threshold = 0.68  # Adjusted threshold for ArcFace model
         
         for student in students:
             # Get student's face embedding
@@ -577,8 +577,14 @@ async def mark_attendance(attendance_data: dict, current_user: dict = Depends(ge
             
             stored_vector = np.array(embedding_doc["embedding"])
             
-            # Calculate cosine distance
-            distance = np.linalg.norm(input_vector - stored_vector)
+            # Calculate cosine similarity for better accuracy with ArcFace
+            dot_product = np.dot(input_vector, stored_vector)
+            norm_a = np.linalg.norm(input_vector)
+            norm_b = np.linalg.norm(stored_vector)
+            cosine_similarity = dot_product / (norm_a * norm_b)
+            
+            # Convert to distance (lower is better)
+            distance = 1 - cosine_similarity
             
             if distance < best_distance:
                 best_distance = distance
