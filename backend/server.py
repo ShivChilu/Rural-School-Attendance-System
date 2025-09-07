@@ -800,10 +800,223 @@ async def enroll_student_face(student_id: str, image_data: dict, current_user: d
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Enrollment failed: {str(e)}")
 
-# Attendance Routes
+# Enhanced Attendance Routes
+@api_router.post("/attendance/mark-enhanced")
+async def mark_attendance_enhanced(attendance_data: dict, current_user: dict = Depends(get_current_user)):
+    """Enhanced attendance marking with retry logic and confidence scoring"""
+    try:
+        class_id = attendance_data["class_id"]
+        image_data = attendance_data["image"]
+        date = attendance_data["date"]
+        retry_count = attendance_data.get("retry_count", 0)
+        
+        # Check teacher access to this class
+        if current_user["role"] != "admin":
+            class_doc = await db.classes.find_one({"id": class_id, "teacher_id": current_user["id"]})
+            if not class_doc:
+                raise HTTPException(status_code=403, detail="Access denied to this class")
+        
+        # Decode image
+        image_array = decode_base64_image(image_data)
+        
+        # Step 1: Validate face quality
+        quality_valid, quality_message = validate_face_quality(image_array)
+        if not quality_valid:
+            return {
+                "recognized": False,
+                "message": f"Face quality issue: {quality_message}",
+                "confidence": 0.0,
+                "retry_recommended": retry_count < 3,
+                "manual_confirm_needed": retry_count >= 2
+            }
+        
+        # Step 2: Detect and crop face using Mediapipe
+        face_crop = detect_and_crop_face_mediapipe(image_array)
+        if face_crop is None:
+            return {
+                "recognized": False,
+                "message": "No face detected in image. Please ensure the face is clearly visible.",
+                "confidence": 0.0,
+                "retry_recommended": retry_count < 3,
+                "manual_confirm_needed": retry_count >= 2
+            }
+        
+        # Step 3: Generate embedding for the input image
+        input_embedding = generate_face_embedding_simple(face_crop)
+        if input_embedding is None:
+            return {
+                "recognized": False,
+                "message": "Failed to process face. Please try with a clearer image.",
+                "confidence": 0.0,
+                "retry_recommended": retry_count < 3,
+                "manual_confirm_needed": retry_count >= 2
+            }
+        
+        input_vector = np.array(input_embedding)
+        
+        # Step 4: Get all enrolled students in this class
+        students = await db.students.find({"class_id": class_id, "is_enrolled": True}).to_list(1000)
+        
+        if not students:
+            raise HTTPException(status_code=400, detail="No enrolled students in this class")
+        
+        # Step 5: Enhanced matching against multiple embeddings per student
+        best_match = None
+        best_confidence = 0.0
+        recognition_threshold = 0.80  # 80% confidence threshold
+        
+        for student in students:
+            # Get all face embeddings for this student
+            embeddings = await db.face_embeddings.find({"student_id": student["id"]}).to_list(100)
+            if not embeddings:
+                continue
+            
+            # Compare against all stored embeddings and take the best match
+            student_best_confidence = 0.0
+            for embedding_doc in embeddings:
+                stored_vector = np.array(embedding_doc["embedding"])
+                
+                # Calculate similarity (using cosine similarity)
+                dot_product = np.dot(input_vector, stored_vector)
+                norm_a = np.linalg.norm(input_vector)
+                norm_b = np.linalg.norm(stored_vector)
+                
+                if norm_a > 0 and norm_b > 0:
+                    cosine_similarity = dot_product / (norm_a * norm_b)
+                    confidence = (cosine_similarity + 1) / 2  # Convert to 0-1 range
+                    
+                    if confidence > student_best_confidence:
+                        student_best_confidence = confidence
+            
+            # Check if this student is the best match overall
+            if student_best_confidence > best_confidence:
+                best_confidence = student_best_confidence
+                best_match = student
+        
+        # Step 6: Decision making based on confidence
+        if best_match is None or best_confidence < 0.50:  # Very low confidence
+            return {
+                "recognized": False,
+                "message": "No student recognized with sufficient confidence",
+                "confidence": best_confidence,
+                "retry_recommended": retry_count < 3,
+                "manual_confirm_needed": retry_count >= 2,
+                "suggested_action": "Please ensure student is properly enrolled or try manual marking"
+            }
+        
+        elif best_confidence >= recognition_threshold:  # High confidence (≥80%)
+            # Check if already marked present today
+            existing_record = await db.attendance_records.find_one({
+                "student_id": best_match["id"],
+                "date": date
+            })
+            
+            if existing_record:
+                return {
+                    "recognized": True,
+                    "student": best_match,
+                    "message": f"Student {best_match['name']} already marked present today",
+                    "confidence": best_confidence,
+                    "already_marked": True
+                }
+            
+            # Mark attendance automatically
+            attendance_record = AttendanceRecord(
+                student_id=best_match["id"],
+                student_name=best_match["name"],
+                class_id=class_id,
+                date=date,
+                confidence=best_confidence,
+                marked_by=current_user["id"]
+            )
+            
+            await db.attendance_records.insert_one(attendance_record.dict())
+            
+            return {
+                "recognized": True,
+                "student": best_match,
+                "message": f"Attendance marked successfully for {best_match['name']}",
+                "confidence": best_confidence,
+                "already_marked": False,
+                "auto_marked": True
+            }
+        
+        else:  # Medium confidence (50-80%) - require teacher confirmation
+            return {
+                "recognized": True,
+                "student": best_match,
+                "message": f"Student possibly identified as {best_match['name']}. Please confirm to mark attendance.",
+                "confidence": best_confidence,
+                "manual_confirm_needed": True,
+                "suggested_student": best_match,
+                "confirmation_required": True
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Enhanced attendance marking failed: {str(e)}")
+
+@api_router.post("/attendance/confirm-manual")
+async def confirm_manual_attendance(confirmation_data: dict, current_user: dict = Depends(get_current_user)):
+    """Confirm manual attendance marking after teacher verification"""
+    try:
+        student_id = confirmation_data["student_id"]
+        class_id = confirmation_data["class_id"]
+        date = confirmation_data["date"]
+        confirmed = confirmation_data.get("confirmed", False)
+        
+        if not confirmed:
+            return {
+                "message": "Attendance marking cancelled by teacher",
+                "marked": False
+            }
+        
+        # Get student info
+        student = await db.students.find_one({"id": student_id})
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        # Check if already marked
+        existing_record = await db.attendance_records.find_one({
+            "student_id": student_id,
+            "date": date
+        })
+        
+        if existing_record:
+            return {
+                "message": f"Student {student['name']} already marked present today",
+                "marked": False,
+                "already_marked": True
+            }
+        
+        # Mark attendance with manual confirmation
+        attendance_record = AttendanceRecord(
+            student_id=student_id,
+            student_name=student["name"],
+            class_id=class_id,
+            date=date,
+            confidence=0.0,  # Manual confirmation
+            marked_by=current_user["id"]
+        )
+        
+        await db.attendance_records.insert_one(attendance_record.dict())
+        
+        return {
+            "message": f"Attendance confirmed and marked for {student['name']}",
+            "marked": True,
+            "manual_confirmed": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Manual confirmation failed: {str(e)}")
+
 @api_router.post("/attendance/mark")
 async def mark_attendance(attendance_data: dict, current_user: dict = Depends(get_current_user)):
-    """Mark attendance using face recognition"""
+    """Legacy attendance marking (kept for backward compatibility)"""
     try:
         class_id = attendance_data["class_id"]
         image_data = attendance_data["image"]
