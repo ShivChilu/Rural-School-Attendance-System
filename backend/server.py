@@ -357,6 +357,24 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     return {"user": current_user}
 
 # Admin Routes
+@api_router.post("/admin/reset-system")
+async def reset_system():
+    """Reset system by clearing all users, sessions, classes, students, and attendance data"""
+    try:
+        # Clear all collections
+        await db.users.delete_many({})
+        await db.sessions.delete_many({})
+        await db.classes.delete_many({})
+        await db.students.delete_many({})
+        await db.face_embeddings.delete_many({})
+        await db.attendance_records.delete_many({})
+        
+        return {"message": "System reset successfully. All data cleared."}
+        
+    except Exception as e:
+        logger.error(f"Error resetting system: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to reset system: {str(e)}")
+
 @api_router.get("/admin/classes", response_model=List[Class])
 async def get_classes(admin: dict = Depends(require_admin)):
     """Get all classes"""
