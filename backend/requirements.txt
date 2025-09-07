@@ -28,3 +28,4 @@ opencv-python>=4.8.0
 Pillow>=10.0.0
 aiofiles>=24.1.0
 mediapipe>=0.10.9
+tf-keras>=2.20.1
