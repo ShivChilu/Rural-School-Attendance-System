@@ -229,11 +229,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "System Reset and User Management"
-    - "Mediapipe Face Detection Integration"
-    - "Face Recognition System Upgrade"
-    - "Student Enrollment with Improved Face Processing"
-    - "Attendance Marking with Enhanced Recognition"
+    - "Camera Component Functionality"
+    - "Authentication Flow"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
