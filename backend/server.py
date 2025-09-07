@@ -51,6 +51,79 @@ face_detection = mp_face_detection.FaceDetection(model_selection=0, min_detectio
 face_mesh = mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1, min_detection_confidence=0.5)
 
 # Helper Functions
+def validate_face_quality(image_array: np.ndarray):
+    """Validate face quality using Mediapipe Face Mesh"""
+    try:
+        # Convert RGB to BGR for mediapipe
+        image_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+        
+        # Detect face mesh
+        results = face_mesh.process(image_bgr)
+        
+        if not results.multi_face_landmarks:
+            return False, "No face detected"
+        
+        face_landmarks = results.multi_face_landmarks[0]
+        h, w, _ = image_array.shape
+        
+        # Get key landmark points
+        landmarks = []
+        for landmark in face_landmarks.landmark:
+            x = int(landmark.x * w)
+            y = int(landmark.y * h)
+            landmarks.append((x, y))
+        
+        # Check face visibility and quality
+        # Eye landmarks (approximate indices)
+        left_eye_indices = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
+        right_eye_indices = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
+        
+        # Calculate eye openness (simple approach)
+        left_eye_openness = calculate_eye_openness(landmarks, left_eye_indices)
+        right_eye_openness = calculate_eye_openness(landmarks, right_eye_indices)
+        
+        # Check if eyes are sufficiently open
+        min_eye_openness = 0.15  # Threshold for eye openness
+        if left_eye_openness < min_eye_openness or right_eye_openness < min_eye_openness:
+            return False, "Eyes not sufficiently open or visible"
+        
+        # Check face pose (using nose and mouth landmarks)
+        nose_tip = landmarks[1]  # Nose tip
+        chin = landmarks[18]      # Chin
+        
+        # Simple face angle check
+        face_center_x = nose_tip[0]
+        if face_center_x < w * 0.3 or face_center_x > w * 0.7:
+            return False, "Face not centered or at extreme angle"
+        
+        return True, "Face quality validation passed"
+        
+    except Exception as e:
+        print(f"Face quality validation error: {str(e)}")
+        return False, f"Validation error: {str(e)}"
+
+def calculate_eye_openness(landmarks, eye_indices):
+    """Calculate eye openness ratio"""
+    try:
+        if len(eye_indices) < 6:
+            return 0.5  # Default value if not enough landmarks
+        
+        # Get eye corner points (simplified)
+        left_corner = landmarks[eye_indices[0]]
+        right_corner = landmarks[eye_indices[3]]
+        top_point = landmarks[eye_indices[1]]
+        bottom_point = landmarks[eye_indices[4]]
+        
+        # Calculate eye width and height
+        eye_width = abs(right_corner[0] - left_corner[0])
+        eye_height = abs(top_point[1] - bottom_point[1])
+        
+        # Return eye openness ratio
+        return eye_height / eye_width if eye_width > 0 else 0.5
+        
+    except Exception:
+        return 0.5  # Default value on error
+
 def detect_and_crop_face_mediapipe(image_array: np.ndarray):
     """Use Mediapipe to detect and crop faces from image"""
     try:
