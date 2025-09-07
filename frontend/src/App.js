@@ -21,9 +21,13 @@ const API = `${BACKEND_URL}/api`;
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Only redirect on 401 if we're not already on the login page
+    if (error.response?.status === 401 && window.location.pathname !== '/') {
       localStorage.removeItem('user');
-      window.location.href = '/';
+      // Use a more gentle redirect approach
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
     }
     return Promise.reject(error);
   }
