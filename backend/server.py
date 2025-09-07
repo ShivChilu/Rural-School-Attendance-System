@@ -21,6 +21,7 @@ from PIL import Image
 import requests
 import asyncio
 import traceback
+import mediapipe as mp
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
