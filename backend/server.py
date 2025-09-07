@@ -40,6 +40,11 @@ api_router = APIRouter(prefix="/api")
 # Security
 security = HTTPBearer(auto_error=False)
 
+# Initialize Mediapipe Face Detection
+mp_face_detection = mp.solutions.face_detection
+mp_drawing = mp.solutions.drawing_utils
+face_detection = mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
+
 # Helper Functions
 def decode_base64_image(base64_string: str) -> np.ndarray:
     """Decode base64 image to numpy array for DeepFace processing"""
