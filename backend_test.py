@@ -10,7 +10,7 @@ from PIL import Image
 import numpy as np
 
 class RuralAttendanceAPITester:
-    def __init__(self, base_url="https://ruralattend.preview.emergentagent.com"):
+    def __init__(self, base_url="https://smart-attendance-21.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.session_token = None

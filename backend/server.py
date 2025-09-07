@@ -184,7 +184,7 @@ class LoginResponse(BaseModel):
 @api_router.get("/auth/login")
 async def login():
     """Redirect to Emergent OAuth"""
-    preview_url = os.environ.get('PREVIEW_URL', 'https://ruralattend.preview.emergentagent.com')
+    preview_url = os.environ.get('PREVIEW_URL', 'https://smart-attendance-21.preview.emergentagent.com')
     auth_url = f"https://auth.emergentagent.com/?redirect={preview_url}/profile"
     return {"auth_url": auth_url}
 
