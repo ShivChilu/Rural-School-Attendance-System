@@ -13,7 +13,6 @@ from datetime import datetime, timezone, timedelta
 import aiofiles
 import json
 import numpy as np
-from deepface import DeepFace
 import cv2
 import base64
 from io import BytesIO
@@ -22,6 +21,14 @@ import requests
 import asyncio
 import traceback
 import mediapipe as mp
+
+# Try to import DeepFace with error handling
+try:
+    from deepface import DeepFace
+    DEEPFACE_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: DeepFace import failed: {e}")
+    DEEPFACE_AVAILABLE = False
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
