@@ -230,7 +230,7 @@ class FaceEmbedding(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     student_id: str
     embedding: List[float]
-    model_name: str = "ArcFace"  # Changed from Facenet to ArcFace
+    model_name: str = "Simple_CV"  # Simple OpenCV-based approach
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class AttendanceRecord(BaseModel):
