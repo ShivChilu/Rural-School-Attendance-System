@@ -95,25 +95,16 @@ def detect_and_crop_face_mediapipe(image_array: np.ndarray):
         return None
 
 def generate_face_embedding_arcface(face_image: np.ndarray):
-    """Generate face embedding using DeepFace with ArcFace model"""
+    """Generate face embedding - currently disabled without DeepFace"""
     try:
         if not DEEPFACE_AVAILABLE:
-            raise HTTPException(status_code=500, detail="DeepFace library not available")
+            raise HTTPException(status_code=500, detail="Face recognition library not available. Please contact administrator.")
             
-        # Use DeepFace with ArcFace model for better accuracy
-        embedding_result = DeepFace.represent(
-            img_path=face_image,
-            model_name="ArcFace",  # Changed from Facenet to ArcFace
-            enforce_detection=False  # We already detected face with Mediapipe
-        )
-        
-        if not embedding_result or len(embedding_result) == 0:
-            return None
-            
-        return embedding_result[0]["embedding"]
+        # DeepFace functionality disabled for now
+        return None
         
     except Exception as e:
-        print(f"ArcFace embedding generation error: {str(e)}")
+        print(f"Face embedding generation error: {str(e)}")
         return None
 
 def decode_base64_image(base64_string: str) -> np.ndarray:
