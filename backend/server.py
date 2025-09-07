@@ -43,10 +43,12 @@ api_router = APIRouter(prefix="/api")
 # Security
 security = HTTPBearer(auto_error=False)
 
-# Initialize Mediapipe Face Detection
+# Initialize Mediapipe Face Detection and Face Mesh
 mp_face_detection = mp.solutions.face_detection
+mp_face_mesh = mp.solutions.face_mesh
 mp_drawing = mp.solutions.drawing_utils
 face_detection = mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
+face_mesh = mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1, min_detection_confidence=0.5)
 
 # Helper Functions
 def detect_and_crop_face_mediapipe(image_array: np.ndarray):
