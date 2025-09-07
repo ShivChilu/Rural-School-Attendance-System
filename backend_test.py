@@ -8,6 +8,7 @@ from datetime import datetime
 from io import BytesIO
 from PIL import Image
 import numpy as np
+import cv2
 
 class RuralAttendanceAPITester:
     def __init__(self, base_url="https://smart-attendance-21.preview.emergentagent.com"):
