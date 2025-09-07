@@ -539,7 +539,7 @@ async def enroll_student_face(student_id: str, image_data: dict, current_user: d
             raise HTTPException(status_code=400, detail="No face detected in image. Please ensure the face is clearly visible and try again.")
         
         # Step 2: Generate face embedding (currently disabled)
-        embedding = generate_face_embedding_arcface(face_crop)
+        embedding = generate_face_embedding_simple(face_crop)
         if embedding is None:
             raise HTTPException(status_code=400, detail="Failed to generate face embedding. Please try with a clearer image.")
         
